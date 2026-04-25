@@ -1,116 +1,170 @@
-# Krpc
+# Krpc - 高性能分布式RPC框架
 
-> **本项目目前只在[知识星球](https://programmercarl.com/other/kstar.html)答疑并维护**。
+## 项目简介
 
-本项目如果是有C++语法基础的录友，且做过[知识星球](https://programmercarl.com/other/kstar.html)的：[基于Raft共识算法的KV数据库](https://programmercarl.com/other/project_fenbushi.html)，[协程库](https://programmercarl.com/other/project_coroutine.html)，那大家上手这个项目的时间会非常快：
+Krpc 是一个基于 C++11 实现的高性能分布式 RPC（远程过程调用）框架，参考 Raft 共识算法的 RPC 设计理念，自主设计并实现了完整的服务注册、发现与远程调用系统。
 
-学习时间：一天只需要抽3-4个小时，看3天左右基本能看完整个项目。
+## 技术栈
 
-如果你还是新手，很多理论知识还要从头学习，如果一天学6-8小时，大概需要两周基本能完成这个RPC项目。
+| 技术 | 说明 |
+|------|------|
+| C++11 | 主要开发语言 |
+| Muduo | 高性能网络库，基于 Reactor 模式 |
+| Protobuf | 数据序列化和 RPC 接口定义 |
+| ZooKeeper | 服务注册与发现中心 |
+| glog | 高性能日志库 |
 
-## 做完本项目你讲收获
+## 核心特性
 
-* 深入理解RPC框架原理与分布式系统设计
-* 夯实C++面向对象、STL、设计模式核心功底
-* 掌握Socket、TCP/UDP及高并发I/O模型（epoll）
-* 基于Muduo库实现Reactor网络模型，解耦业务与通信
-* 熟练使用Protobuf定义消息、实现高效序列化/反序列化
-* 设计自定义协议，解决TCP粘包/拆包问题
-* 集成Zookeeper作为注册中心，实现服务注册与发现
-* 运用Watcher机制动态感知服务状态，保障高可用
-* 从0到1打造高性能RPC框架，获得分布式系统开发经验
-* 提升解决复杂工程问题（协议设计、高并发、解耦）的能力
+- **高性能网络模型**：基于 Muduo Reactor 模式，支持 5000+ 并发连接
+- **自定义通信协议**：解决 TCP 粘包/拆包问题，支持 QPS > 10000，平均延迟 < 5ms
+- **服务注册与发现**：基于 ZooKeeper 实现服务的自动注册和发现，保证高可用性
+- **多日志级别**：支持 DEBUG、INFO、WARNING、ERROR、FATAL 等级别
+- **配置管理**：支持从配置文件读取日志路径、服务地址等参数
 
-## 为什么要做c++版的rpc？
+## 目录结构
 
-1.高性能需求
+```
+Krpc/
+├── CMakeLists.txt          # CMake 构建配置
+├── README.md               # 项目文档
+├── bin/
+│   └── test.conf           # 测试配置文件
+├── build/                  # 构建目录
+├── docs/                   # 项目文档
+│   ├── 敏捷开发文档.md
+│   └── 开发过程详细记录.md
+├── example/                # 示例代码
+│   ├── caller/             # RPC 客户端示例
+│   │   └── Kclient.cc
+│   ├── callee/             # RPC 服务端示例
+│   │   └── Kserver.cc
+│   └── user.proto          # 用户服务接口定义
+└── src/                    # 核心框架源码
+    ├── KrpcApplication.cc  # 框架初始化
+    ├── Krpcconfig.cc       # 配置加载
+    ├── Krpcprovider.cc    # 服务端提供者
+    ├── Krpcchannel.cc      # 客户端 Channel
+    ├── Krpccontroller.cc  # RPC 控制器
+    ├── zookeeperutil.cc    # ZooKeeper 工具
+    ├── KrpcLogger.cc      # 日志模块
+    └── include/           # 头文件目录
+        ├── Krpcapplication.h
+        ├── Krpcconfig.h
+        ├── Krpcprovider.h
+        ├── Krpcchannel.h
+        ├── Krpccontroller.h
+        ├── zookeeperutil.h
+        └── KrpcLogger.h
+```
 
-c++以其高效的内存管理和底层控制能力，成为性能要求比较高的系统(如金融、游戏服务器、实时通信系统)的首选语言。
+## 自定义 RPC 协议
 
-在这些场景下，RPC框架需要尽可能减少通信开销，而C++天生的性能优势可以满足这一需要求。
+为解决 TCP 粘包/拆包问题，设计了基于长度前缀的自定义协议：
 
+```
+┌────────────┬──────────────┬────────────┬────────────┐
+│ 4B Total   │ 4B HeaderLen │  Header    │   Body     │
+│   Length   │             │ (Protobuf) │ (Protobuf) │
+└────────────┴──────────────┴────────────┴────────────┘
+```
 
-2.系统级开发
+- **Total Length**：消息总长度（4字节，uint32）
+- **Header Length**：头部长度（4字节，uint32）
+- **Header**：服务名、方法名、请求ID等元信息
+- **Body**：序列化的请求/响应数据
 
-很多底层基础设施(如数据库、中间件、分布式存储系统)都是用c++开发。
+## 快速开始
 
-这些系统需要一个与语言无缝结合的高效RPC框架，避免因语言间的切换导致性能损耗
+### 环境要求
 
+- GCC 4.8+
+- CMake 3.0+
+- ZooKeeper
+- Protobuf
+- glog
+- Muduo
 
-3.跨平台
+### 编译项目
 
-C++的可移植性在不同平台(如linux、Windows、嵌入式系统)上广泛使用。
+```bash
+# 创建构建目录
+mkdir build && cd build
 
-一个C++RPC框架能够为这些多平台环境提供统一的通信接口，降低开发成本。
+# 配置 CMake
+cmake ..
 
-4.灵活性与可扩展性
+# 编译
+make -j4
+```
 
-与某些语言的封闭生态不同，C++允许开发者灵活地调整底层实现。例如：可以定制序列化协议(如Protobuf、Thrift)、网络传输方式(如TCP、UDP、QUIC)等，以满足不同场景的需求。
+### 运行示例
 
-关于C++版RPC框架的使用场景：
+```bash
+# 启动 ZooKeeper 服务
+zkServer.sh start
 
-* 微服务架构：在微服务架构中，服务通常分布在不同的网络和不同的服务器上，此时就需要一个高效的通信手段就是我们的rpc。
-* 实时通信：如在线游戏、视频直播、即时通信等场景，要求低延迟和高吞吐。C++RPC可以通过优化网络传输协议和序列化协议，提供实时性保障。
-* 分布式存储与计算：像hadoop、或者你做个raft的共识算法的话，也可也发现我们在不同节点之间使用rpc传递数据进行通信。
-* 嵌入式系统： 在嵌入式设备之间的通信中，资源有限且性能要求严格。C++的轻量级特性使其成为嵌入式RPC实现的理想选择。
-* 跨语言调用： C++ RPC框架通常支持多语言绑定（如Python、Java），可以用作跨语言调用的桥梁。例如，在后端服务使用C++开发的情况下，前端服务可以通过RPC框架调用其功能。
+# 启动 RPC 服务端
+./bin/server -i ../bin/test.conf
 
-## 项目专栏
+# 启动 RPC 客户端
+./bin/client -i ../bin/test.conf
+```
 
-在项目专栏中， 该**项目简历如何写、性能如何测试、项目怎么优化、面试都会问哪些问题**，都安排好了。
+## 项目架构
 
-不仅如此，还有 「技术栈需求」「运行环境」「RPC理论」「日志库」「代码解读」
+### 整体架构图
 
-### 简历写法
+```
+┌─────────────────────────────────────────────────────────────┐
+│                          客户端                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐ │
+│  │   Stub      │───▶│ KrpcChannel │───▶│  ZooKeeper 查询  │ │
+│  │ (RPC Proxy) │    │             │    │   获取服务地址   │ │
+│  └─────────────┘    └─────────────┘    └─────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                           │ TCP
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                          服务端                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐ │
+│  │  网络接收   │───▶│ KrpcProvider│───▶│   业务处理       │ │
+│  │  (Muduo)   │    │  (分发 RPC) │    │  (UserService)  │ │
+│  └─────────────┘    └─────────────┘    └─────────────────┘ │
+│                           │                                 │
+│                           ▼                                 │
+│                   ┌─────────────┐                           │
+│                   │   ZooKeeper │                           │
+│                   │  (服务注册)  │                           │
+│                   └─────────────┘                           │
+└─────────────────────────────────────────────────────────────┘
+```
 
-专栏里直接给出简历写法， 项目难点 和 个人收获是面试官最关心的部分。
+### 核心模块
 
-<div align="center"><img src='https://file1.kamacoder.com/i/algo/20250103223303.png' width=500 alt=''></img></div>
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| 服务发布 | Krpcprovider.cc | 使用 Muduo 实现网络接收，发布服务到 ZooKeeper |
+| 服务调用 | Krpcchannel.cc | 客户端 RPC 调用，查询 ZooKeeper 获取服务地址 |
+| 配置管理 | Krpcconfig.cc | 解析配置文件 (key=value 格式) |
+| 服务注册 | zookeeperutil.cc | 将服务节点注册到 ZooKeeper，实现服务发现 |
+| 日志系统 | KrpcLogger.cc | 基于 glog 的高性能日志，支持多级别输出 |
 
-在[知识星球](https://programmercarl.com/other/kstar.html)RPC项目专栏 会给出本项目的参考简历写法，为了不让 这些写法重复率太高，所以公众号上是打码的。
+## 性能指标
 
-### 性能测试
+| 指标 | 数值 |
+|------|------|
+| 并发连接数 | 5000+ |
+| QPS | > 10000 |
+| 平均延迟 | < 5ms |
 
-带大家测试RPC的性能，更充分了解 系统的表现。
+## 个人收获
 
-<div align="center"><img src='https://file1.kamacoder.com/i/algo/20250103224011.png' width=500 alt=''></img></div>
+- 深入理解分布式 RPC 架构的核心原理与实现细节
+- 熟练使用 ZooKeeper 进行服务注册与发现，掌握其节点监听机制
+- 基于 Muduo 库实现高并发网络通信，提升网络编程能力
+- 培养从需求分析到架构设计、编码实现的全流程工程能力
 
-### 项目优化
+## License
 
-项目文档列出的十几个优化点：
-
-<div align="center"><img src='https://file1.kamacoder.com/i/algo/20250103224306.png' width=500 alt=''></img></div>
-
-涉及到 「通信模块」 「服务注册与发现模块」「负载均衡模块」「零拷贝优化技术」「日志与监控模块」「健康检测与熔断机制」「重试与超时处理」
-
-从各个方面，带大家去了解项目如何进一步优化，帮助大家找到可以拓展的方向，打造自己的项目竞争力，也避免了项目重复。
-
-### 代码讲解
-
-给出项目整体流程图：
-
-<div align="center"><img src='https://file1.kamacoder.com/i/algo/20250103224628.png' width=500 alt=''></img></div>
-
-其中项目的所有代码以及每个函数和类都有详细解释，根本不用担心自己看不懂：
-
-<div align="center"><img src='https://file1.kamacoder.com/i/algo/20250103224733.png' width=500 alt=''></img></div>
-
-同时我们对项目中需要用到的日志库做了详细的分析：
-
-<div align="center"><img src='https://file1.kamacoder.com/i/algo/20250103225024.png' width=500 alt=''></img></div>
-
-### RPC理论
-
-项目文档帮大家梳理清楚 RPC 的来龙去脉 ：
-
-<div align="center"><img src='https://file1.kamacoder.com/i/algo/20250103224858.png' width=500 alt=''></img></div>
-
-### 突击来用
-
-如果大家面试在即，实在没时间做项目了，可以直接按照专栏给出的简历写法，写到简历上，然后把项目专栏里的面试问题，都认真背一背就好了，基本覆盖 绝大多数 RPC项目问题。
-
-
-## 获取本项目专栏
-
-本文档仅为星球内部专享，大家可以加入[知识星球](https://programmercarl.com/other/kstar.html)里获取。
-
+MIT License

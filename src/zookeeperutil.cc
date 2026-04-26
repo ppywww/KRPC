@@ -116,8 +116,8 @@ bool is_connected = false;  // 标记ZooKeeper客户端是否连接成功
 struct SyncContext {
     std::mutex mutex;
     std::condition_variable cond;
-    int rc;
-    std::string data;
+    int rc;//返回码
+    std::string data;//节点数据
 };
 
 // 全局的watcher观察器，用于接收ZooKeeper服务器的通知

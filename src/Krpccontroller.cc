@@ -28,6 +28,13 @@ void Krpccontroller::SetFailed(const std::string &reason) {
     m_errText = reason; // 记录失败原因
 }
 
+
+// 判断是否是超时错误
+bool Krpccontroller::IsTimeout() const {
+    return m_failed && 
+           (m_errText.find("timeout") != std::string::npos);
+}
+
 // 以下功能未实现，是RPC服务端提供的取消功能
 // 开始取消RPC调用（未实现）
 void Krpccontroller::StartCancel() {

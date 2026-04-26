@@ -14,15 +14,25 @@
 std::mutex g_data_mutx;  // 全局互斥锁，用于保护共享数据的线程安全
 
 
-// 辅助函数：循环读取直到读够 size 字节
-ssize_t KrpcChannel::recv_exact(int fd, char* buf, size_t size) {
+// 修改后的 recv_exact 函数
+ssize_t KrpcChannel::recv_exact(int fd, char* buf, size_t size, int timeout_sec) {
     size_t total_read = 0;
+    
+    // 设置超时
+    struct timeval tv;
+    tv.tv_sec = timeout_sec;
+    tv.tv_usec = 0;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    
     while (total_read < size) {
         ssize_t ret = recv(fd, buf + total_read, size - total_read, 0);
-        if (ret == 0) return 0; // 对端关闭
+        if (ret == 0) return 0;      // 对端关闭
         if (ret == -1) {
-            if (errno == EINTR) continue; // 中断信号，继续读
-            return -1; // 错误
+            if (errno == EINTR) continue;      // 中断信号，继续读
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return -1;  // 超时
+            }
+            return -1;  // 其他错误
         }
         total_read += ret;
     }
@@ -109,25 +119,38 @@ void KrpcChannel::CallMethod(const ::google::protobuf::MethodDescriptor *method,
     // 5. 接收响应
     // 格式：[4B Total Len] + [Response Data]
     
-    // A. 先读4字节长度头
-    uint32_t response_len = 0;
-    if (recv_exact(m_clientfd, (char*)&response_len, 4) != 4) {
-        close(m_clientfd);
-        m_clientfd = -1;
+
+// 设置超时时间为 5 秒
+const int RPC_TIMEOUT_SEC = 5;
+
+// A. 先读4字节长度头
+uint32_t response_len = 0;
+ssize_t ret = recv_exact(m_clientfd, (char*)&response_len, 4, RPC_TIMEOUT_SEC);
+if (ret != 4) {
+    if (ret == -1 && errno == EAGAIN) {
+        controller->SetFailed("recv response timeout");
+    } else {
         controller->SetFailed("recv response length error");
-        return;
     }
-    response_len = ntohl(response_len); // 转回主机字节序
+    close(m_clientfd);
+    m_clientfd = -1;
+    return;
+}
+response_len = ntohl(response_len);
 
-    // B. 根据长度读取Body
-    std::vector<char> recv_buf(response_len);
-    if (recv_exact(m_clientfd, recv_buf.data(), response_len) != response_len) {
-        close(m_clientfd);
-        m_clientfd = -1;
+// B. 根据长度读取Body（也需要超时）
+std::vector<char> recv_buf(response_len);
+ret = recv_exact(m_clientfd, recv_buf.data(), response_len, RPC_TIMEOUT_SEC);
+if (ret != response_len) {
+    if (ret == -1 && errno == EAGAIN) {
+        controller->SetFailed("recv response body timeout");
+    } else {
         controller->SetFailed("recv response body error");
-        return;
     }
-
+    close(m_clientfd);
+    m_clientfd = -1;
+    return;
+}
     // 6. 反序列化响应
     if (!response->ParseFromArray(recv_buf.data(), response_len)) {
         close(m_clientfd);
@@ -147,6 +170,13 @@ bool KrpcChannel::newConnect(const char *ip, uint16_t port) {
         LOG(ERROR) << "socket error:" << errtxt;  // 记录错误日志
         return false;
     }
+
+   
+    struct timeval tv;
+    tv.tv_sec = 5;  // 5秒超时
+    tv.tv_usec = 0;
+    setsockopt(clientfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));  // 发送超时
+    setsockopt(clientfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));  // 接收超时
 
     // 设置服务器地址信息
     struct sockaddr_in server_addr;

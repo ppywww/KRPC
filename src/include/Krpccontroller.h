@@ -14,6 +14,9 @@ public:
 std::string ErrorText() const;
 void SetFailed(const std::string &reason);
 
+//超时
+bool IsTimeout() const;
+
 //目前未实现具体的功能
 void StartCancel();
 bool IsCanceled() const;

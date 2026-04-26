@@ -22,7 +22,6 @@ void KrpcProvider::NotifyService(google::protobuf::Service *service) {
 
     // 通过 ServiceDescriptor，我们可以获取该服务类中定义的方法列表，
     // 并进行相应的注册和管理。
-
     // 获取服务的名字
     std::string service_name = psd->name();
     // 获取服务端对象service的方法数量
@@ -177,6 +176,19 @@ void KrpcProvider::OnMessage(const muduo::net::TcpConnectionPtr &conn, muduo::ne
         service->CallMethod(method, nullptr, request, response, done);
     }
 }
+
+// // 创建 Closure 回调对象
+// google::protobuf::Closure *done = google::protobuf::NewCallback<
+//     KrpcProvider,                                // 类类型
+//     const muduo::net::TcpConnectionPtr &,        // 参数 1 类型
+//     google::protobuf::Message *>(                // 参数 2 类型
+//         this,                                    // 实例指针
+//         &KrpcProvider::SendRpcResponse,          // 回调方法
+//         conn, response                           // 实际参数
+//     );
+
+// // 调用服务方法
+// service->CallMethod(method, nullptr, request, response, done);
 
 // 发送RPC响应给客户端
 void KrpcProvider::SendRpcResponse(const muduo::net::TcpConnectionPtr &conn, google::protobuf::Message *response) {

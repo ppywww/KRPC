@@ -14,7 +14,7 @@
 class KrpcLogger {
 public:
     explicit KrpcLogger(const char* argv0, const std::string& log_dir = "") {
-        google::InitGoogleLogging(argv0);
+        
         FLAGS_colorlogtostderr = true;
         
         if (!log_dir.empty()) {
@@ -26,6 +26,8 @@ public:
         
         FLAGS_minloglevel = 0;
         FLAGS_max_log_size = 100;
+
+        google::InitGoogleLogging(argv0);
     }
     
     ~KrpcLogger() {

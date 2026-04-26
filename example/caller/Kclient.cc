@@ -16,7 +16,7 @@
 // ============================================
 struct TestConfig {
     int thread_count = 16;           // 并发线程数
-    int requests_per_thread = 500;    // 每个线程发送的请求数
+    int requests_per_thread = 200;    // 每个线程发送的请求数
     bool test_register = false;     // 是否测试注册功能
     bool test_login = true;         // 是否测试登录功能
     bool verbose = true;            // 是否打印详细日志
